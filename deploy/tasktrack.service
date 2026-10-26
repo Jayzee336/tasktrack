@@ -1,0 +1,28 @@
+[Unit]
+Description=TaskTrack Flask application
+After=network.target
+
+[Service]
+Type=simple
+User=tasktrack
+Group=tasktrack
+WorkingDirectory=/opt/tasktrack
+EnvironmentFile=/etc/tasktrack/tasktrack.env
+Environment=TASKTRACK_DATA_DIR=/var/lib/tasktrack
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/tasktrack/.venv/bin/gunicorn --workers 2 --bind 127.0.0.1:5000 --timeout 30 --access-logfile - --error-logfile - app:app
+Restart=on-failure
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/tasktrack
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target
