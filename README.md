@@ -53,6 +53,31 @@ tasktrack/
 - `tests/` contains the automated pytest suite. Local database inspection scripts are intentionally not tracked.
 - `deploy/` contains deployment examples that must be reviewed before use.
 
+## Phase 05 — Quick Actions and Smart Search
+
+- Search tasks by title, category, or notes.
+- Combine search with status, priority, due-date, and dashboard navigation filters.
+- Clear all filters with one action.
+- Open the keyboard-accessible command palette with **Ctrl+K** on Windows/Linux or **Cmd+K** on macOS.
+- Use the palette for quick task creation, search, navigation filters, list/board switching, and calendar month/week views.
+- Navigate command results with the arrow keys, run with Enter, and close with Escape.
+
+### Local development and tests
+
+On Windows CMD, from the project directory:
+
+\`\`\`cmd
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+python -m pytest -q
+node --check static\app.js
+node --check static\calendar.js
+\`\`\`
+
+The production dependencies live in \`requirements.txt\`; test/development dependencies live in \`requirements-dev.txt\`.
+
 ## 3. Which Files Should Be Transferred to Ubuntu?
 
 ### Required application files

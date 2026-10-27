@@ -272,7 +272,9 @@
 
         <div class="top-actions">
           <span id="current-date" class="date-chip"></span>
-
+          <button id="open-command-palette" class="btn secondary command-trigger" type="button" aria-keyshortcuts="Control+K Meta+K" title="Open command palette (Ctrl+K)">
+            <span aria-hidden="true">⌘</span> Commands <kbd>Ctrl K</kbd>
+          </button>
           <button id="new-task" class="btn primary" type="button">
             ＋ New task
           </button>
@@ -388,7 +390,7 @@
       </section>
      
 <!-- Calendar and Planning -->
-<section class="calendar-planning-panel glass" aria-labelledby="calendar-heading">
+<section id="calendar-planning-panel" class="calendar-planning-panel glass" aria-labelledby="calendar-heading">
   <div class="calendar-planning-header">
     <div>
       <span class="eyebrow">PLAN AHEAD</span>
@@ -521,19 +523,33 @@
             <input
               id="search"
               type="search"
-              placeholder="⌕  Search tasks..."
-              aria-label="Search tasks"
+              placeholder="⌕  Search title, category, notes..."
+              aria-label="Search tasks by title, category, or notes"
             >
 
-            <select
-              id="priority-filter"
-              aria-label="Filter priority"
-            >
+            <select id="priority-filter" aria-label="Filter priority">
               <option value="all">All priorities</option>
               <option value="high">High priority</option>
               <option value="medium">Medium priority</option>
               <option value="low">Low priority</option>
             </select>
+
+            <select id="status-filter" aria-label="Filter by status">
+              <option value="all">All statuses</option>
+              <option value="todo">To Do</option>
+              <option value="in_progress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
+
+            <select id="due-date-filter" aria-label="Filter by due date">
+              <option value="all">All due dates</option>
+              <option value="today">Due today</option>
+              <option value="overdue">Overdue</option>
+              <option value="next7">Next 7 days</option>
+              <option value="no-date">No due date</option>
+            </select>
+
+            <button id="clear-filters" class="clear-filters-btn" type="button">Clear filters</button>
           </div>
           <div class="view-switch" role="group" aria-label="Task view">
             <button type="button" id="list-view-btn" class="view-switch-btn active" aria-pressed="true">List</button>
@@ -586,6 +602,30 @@
   </section>
 </main>
 
+
+
+<!-- ==========================================
+     PHASE 05 — QUICK ACTIONS COMMAND PALETTE
+=========================================== -->
+<div id="command-palette" class="command-overlay" hidden>
+  <section class="command-dialog glass" role="dialog" aria-modal="true" aria-labelledby="command-title" tabindex="-1">
+    <header class="command-dialog-header">
+      <div>
+        <span class="eyebrow">QUICK ACTIONS</span>
+        <h2 id="command-title">What do you want to do?</h2>
+      </div>
+      <button id="close-command-palette" class="icon-btn" type="button" aria-label="Close command palette">×</button>
+    </header>
+    <label class="sr-only" for="command-search">Search commands</label>
+    <input id="command-search" class="command-search" type="search" autocomplete="off" placeholder="Search actions, filters, and views…" aria-controls="command-list">
+    <div id="command-list" class="command-list" role="listbox" aria-label="Available commands"></div>
+    <footer class="command-dialog-footer">
+      <span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+      <span><kbd>Enter</kbd> Run</span>
+      <span><kbd>Esc</kbd> Close</span>
+    </footer>
+  </section>
+</div>
 
 <!-- ==========================================
      CREATE / EDIT TASK MODAL

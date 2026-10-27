@@ -10,6 +10,8 @@ const state = {
   filter: "all",
   search: "",
   priority: "all",
+  statusFilter: "all",
+  dueDateFilter: "all",
   editingId: null,
   deletingId: null,
   deleting: false,
@@ -237,36 +239,44 @@ async function loadTasks() {
 
 function visibleTasks() {
   const today = todayISO();
-  const query = state.search.toLowerCase();
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const nextWeekISO = `${nextWeek.getFullYear()}-${String(nextWeek.getMonth() + 1).padStart(2, "0")}-${String(nextWeek.getDate()).padStart(2, "0")}`;
+  const query = state.search.trim().toLocaleLowerCase();
 
   return state.tasks.filter((task) => {
-    const matchesText =
-      `${task.title} ${task.description || ""} ${task.category || ""}`
-        .toLowerCase()
-        .includes(query);
+    const searchableText = [
+      task.title,
+      task.category,
+      task.description,
+      task.notes
+    ].filter(Boolean).join(" ").toLocaleLowerCase();
 
+    const matchesText = searchableText.includes(query);
     const matchesPriority =
       state.priority === "all" || task.priority === state.priority;
+    const status = normalizedStatus(task);
+    const matchesStatus =
+      state.statusFilter === "all" || status === state.statusFilter;
+    const dueDate = task.due_date || "";
+    const matchesDueDate =
+      state.dueDateFilter === "all" ||
+      (state.dueDateFilter === "today" && dueDate === today) ||
+      (state.dueDateFilter === "overdue" && dueDate && dueDate < today && status !== "done") ||
+      (state.dueDateFilter === "next7" && dueDate > today && dueDate <= nextWeekISO) ||
+      (state.dueDateFilter === "no-date" && !dueDate);
 
-    const matchesFilter =
+    const matchesNavigation =
       state.filter === "all" ||
-      (state.filter === "today" &&
-        task.due_date === today &&
-        !task.completed) ||
-      (state.filter === "upcoming" &&
-        task.due_date &&
-        task.due_date > today &&
-        !task.completed) ||
-      (state.filter === "overdue" &&
-        task.due_date &&
-        task.due_date < today &&
-        !task.completed) ||
-      (state.filter === "completed" && task.completed);
+      (state.filter === "today" && dueDate === today && status !== "done") ||
+      (state.filter === "upcoming" && dueDate && dueDate > today && status !== "done") ||
+      (state.filter === "overdue" && dueDate && dueDate < today && status !== "done") ||
+      (state.filter === "completed" && status === "done");
 
-    return matchesText && matchesPriority && matchesFilter;
+    return matchesText && matchesPriority && matchesStatus &&
+      matchesDueDate && matchesNavigation;
   });
 }
-
 // ========================================
 // TASK RENDERING
 // ========================================
@@ -846,6 +856,171 @@ toast(
 // INITIALIZATION
 // ========================================
 
+
+const commandPaletteState = {
+  query: "",
+  selectedIndex: 0,
+  visibleCommands: []
+};
+
+const commandDefinitions = [
+  { id: "create-task", label: "Create a task", description: "Open the quick task form", keywords: "new add quick task deadline" },
+  { id: "focus-search", label: "Search tasks", description: "Jump to title, category, and notes search", keywords: "find search notes category title" },
+  { id: "clear-filters", label: "Clear all filters", description: "Reset search, status, priority, and due date", keywords: "reset clear all filters" },
+  { id: "filter-all", label: "Show all tasks", description: "Return to the complete task list", keywords: "overview everything all tasks" },
+  { id: "filter-today", label: "Show tasks due today", description: "Focus on today's work", keywords: "today due focus" },
+  { id: "filter-overdue", label: "Show overdue tasks", description: "Review past-due work", keywords: "overdue late missed" },
+  { id: "filter-upcoming", label: "Show upcoming tasks", description: "Look ahead at upcoming deadlines", keywords: "upcoming future plan" },
+  { id: "filter-completed", label: "Show completed tasks", description: "Review finished work", keywords: "completed done finished" },
+  { id: "view-list", label: "Switch to list view", description: "Show tasks as rows", keywords: "list rows table" },
+  { id: "view-board", label: "Switch to Kanban board", description: "Show To Do, In Progress, and Done columns", keywords: "board kanban columns drag" },
+  { id: "calendar-month", label: "Open calendar month view", description: "Plan across a full month", keywords: "calendar month planning" },
+  { id: "calendar-week", label: "Open calendar week view", description: "Plan the current selected week", keywords: "calendar week planning" }
+];
+
+function clearAllFilters() {
+  state.filter = "all";
+  state.search = "";
+  state.priority = "all";
+  state.statusFilter = "all";
+  state.dueDateFilter = "all";
+  $("#search").value = "";
+  $("#priority-filter").value = "all";
+  $("#status-filter").value = "all";
+  $("#due-date-filter").value = "all";
+  render();
+}
+
+function setNavigationFilter(filter) {
+  state.filter = filter;
+  render();
+  document.querySelector(".task-panel")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
+function renderCommandPalette() {
+  const list = $("#command-list");
+  if (!list) return;
+
+  const query = commandPaletteState.query.trim().toLocaleLowerCase();
+  commandPaletteState.visibleCommands = commandDefinitions.filter((command) =>
+    (command.label + " " + command.description + " " + command.keywords)
+      .toLocaleLowerCase().includes(query)
+  );
+
+  if (!commandPaletteState.visibleCommands.length) {
+    list.innerHTML = '<p class="command-empty">No matching actions. Try another search.</p>';
+    commandPaletteState.selectedIndex = 0;
+    return;
+  }
+
+  commandPaletteState.selectedIndex = Math.min(
+    commandPaletteState.selectedIndex,
+    commandPaletteState.visibleCommands.length - 1
+  );
+
+  list.innerHTML = commandPaletteState.visibleCommands.map((command, index) =>
+    '<button type="button" role="option" class="command-option ' +
+      (index === commandPaletteState.selectedIndex ? "is-selected" : "") +
+      '" data-command-id="' + esc(command.id) + '" aria-selected="' +
+      (index === commandPaletteState.selectedIndex ? "true" : "false") + '">' +
+      '<span class="command-option-icon" aria-hidden="true">' +
+        (command.id === "create-task" ? "+" :
+         command.id === "focus-search" ? "⌕" :
+         command.id.startsWith("calendar-") ? "▦" :
+         command.id.startsWith("view-") ? "▤" : "↗") +
+      '</span>' +
+      '<span class="command-option-copy"><strong>' + esc(command.label) +
+      '</strong><small>' + esc(command.description) + '</small></span>' +
+      '<span class="command-option-shortcut">' + esc(command.shortcut || "↵") + '</span>' +
+    '</button>'
+  ).join("");
+}
+
+function openCommandPalette() {
+  if (!state.user || !$("#dashboard-view") || $("#dashboard-view").hidden) return;
+  if (!$("#modal").hidden || !$("#deleteModal").hidden) return;
+
+  $("#command-palette").hidden = false;
+  document.body.style.overflow = "hidden";
+  commandPaletteState.query = "";
+  commandPaletteState.selectedIndex = 0;
+  $("#command-search").value = "";
+  renderCommandPalette();
+  $("#command-search").focus();
+}
+
+function closeCommandPalette() {
+  const palette = $("#command-palette");
+  if (!palette || palette.hidden) return;
+  palette.hidden = true;
+  if ($("#modal").hidden && $("#deleteModal").hidden) {
+    document.body.style.overflow = "";
+  }
+}
+
+function runCommand(commandId) {
+  closeCommandPalette();
+
+  switch (commandId) {
+    case "create-task":
+      openModal();
+      break;
+    case "focus-search":
+      $("#search").focus();
+      $(".task-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      break;
+    case "clear-filters":
+      clearAllFilters();
+      break;
+    case "filter-all":
+      setNavigationFilter("all");
+      break;
+    case "filter-today":
+      setNavigationFilter("today");
+      break;
+    case "filter-overdue":
+      setNavigationFilter("overdue");
+      break;
+    case "filter-upcoming":
+      setNavigationFilter("upcoming");
+      break;
+    case "filter-completed":
+      setNavigationFilter("completed");
+      break;
+    case "view-list":
+      state.view = "list";
+      render();
+      $(".task-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      break;
+    case "view-board":
+      state.view = "board";
+      render();
+      $(".task-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      break;
+    case "calendar-month":
+      $("#calendar-month-view")?.click();
+      $("#calendar-planning-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      break;
+    case "calendar-week":
+      $("#calendar-week-view")?.click();
+      $("#calendar-planning-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      break;
+    default:
+      break;
+  }
+}
+
+function selectCommandAt(index) {
+  const total = commandPaletteState.visibleCommands.length;
+  if (!total) return;
+  commandPaletteState.selectedIndex = (index + total) % total;
+  renderCommandPalette();
+  $("#command-list [aria-selected='true']")?.scrollIntoView({ block: "nearest" });
+}
+
 async function boot() {
   $("#auth-form").addEventListener("submit", submitAuth);
   $("#task-form").addEventListener("submit", submitTask);
@@ -889,7 +1064,9 @@ async function boot() {
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
 
-    if (!$("#deleteModal").hidden) {
+    if (!$("#command-palette").hidden) {
+      closeCommandPalette();
+    } else if (!$("#deleteModal").hidden) {
       closeDeleteModal();
     } else if (!$("#modal").hidden) {
       closeModal();
@@ -960,6 +1137,61 @@ async function boot() {
     render();
   });
 
+  $("#status-filter").addEventListener("change", (event) => {
+    state.statusFilter = event.target.value;
+    render();
+  });
+
+  $("#due-date-filter").addEventListener("change", (event) => {
+    state.dueDateFilter = event.target.value;
+    render();
+  });
+
+  $("#clear-filters").addEventListener("click", clearAllFilters);
+
+  $("#open-command-palette").addEventListener("click", openCommandPalette);
+  $("#close-command-palette").addEventListener("click", closeCommandPalette);
+  $("#command-palette").addEventListener("click", (event) => {
+    if (event.target === $("#command-palette")) closeCommandPalette();
+  });
+
+  $("#command-search").addEventListener("input", (event) => {
+    commandPaletteState.query = event.target.value;
+    commandPaletteState.selectedIndex = 0;
+    renderCommandPalette();
+  });
+
+  $("#command-search").addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      selectCommandAt(commandPaletteState.selectedIndex + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      selectCommandAt(commandPaletteState.selectedIndex - 1);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const command = commandPaletteState.visibleCommands[commandPaletteState.selectedIndex];
+      if (command) runCommand(command.id);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeCommandPalette();
+    }
+  });
+
+  $("#command-list").addEventListener("click", (event) => {
+    const option = event.target.closest("[data-command-id]");
+    if (option) runCommand(option.dataset.commandId);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      if ($("#command-palette").hidden) openCommandPalette();
+      else closeCommandPalette();
+    }
+  });
+
   $("#logout").addEventListener("click", async () => {
     try {
       await api("/api/logout", { method: "POST" });
@@ -973,10 +1205,14 @@ async function boot() {
     state.filter = "all";
     state.search = "";
     state.priority = "all";
+    state.statusFilter = "all";
+    state.dueDateFilter = "all";
     state.togglingIds.clear();
 
     $("#search").value = "";
     $("#priority-filter").value = "all";
+    $("#status-filter").value = "all";
+    $("#due-date-filter").value = "all";
 
     render();
     showAuth();
