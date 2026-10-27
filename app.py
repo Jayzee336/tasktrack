@@ -111,7 +111,43 @@ def init_db():
 
             CREATE INDEX IF NOT EXISTS idx_tasks_user
             ON tasks(user_id, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS focus_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL
+        REFERENCES users(id) ON DELETE CASCADE,
+    task_id INTEGER
+        REFERENCES tasks(id) ON DELETE SET NULL,
+    session_type TEXT NOT NULL
+        CHECK(session_type IN ('focus', 'short_break', 'long_break')),
+    duration_minutes INTEGER NOT NULL
+        CHECK(duration_minutes BETWEEN 1 AND 180),
+    completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_focus_sessions_user
+ON focus_sessions(user_id, completed_at DESC);
             """
+        )
+
+        columns = {
+            row["name"]
+            for row in db.execute("PRAGMA table_info(tasks)").fetchall()
+        }
+        if "status" not in columns:
+            db.execute(
+                "ALTER TABLE tasks ADD COLUMN status TEXT NOT NULL DEFAULT 'todo'"
+            )
+        # One-time-safe synchronization: preserve completed tasks from older versions.
+        db.execute(
+            """
+            UPDATE tasks
+            SET status = CASE WHEN completed = 1 THEN 'done' ELSE 'todo' END
+            WHERE status IS NULL OR status NOT IN ('todo', 'in_progress', 'done')
+            """
+        )
+        db.execute(
+            "UPDATE tasks SET completed = CASE WHEN status = 'done' THEN 1 ELSE 0 END"
         )
 
 
@@ -242,26 +278,22 @@ def parse_task(data):
     priority = data.get("priority", "medium")
     due_date = data.get("due_date")
     completed = data.get("completed", False)
+    status = data.get("status")
 
     if not isinstance(title, str):
         raise ValueError("Task title must be 1–160 characters.")
-
     if not isinstance(description, str):
         raise ValueError("Notes must be text.")
-
     if not isinstance(category, str):
         raise ValueError("Category must be text.")
-
     if not isinstance(priority, str):
         raise ValueError("Choose a valid priority.")
 
     if due_date == "":
         due_date = None
-
     if due_date is not None:
         if not isinstance(due_date, str):
             raise ValueError("Due date must be a valid date.")
-
         try:
             date.fromisoformat(due_date)
         except ValueError:
@@ -274,32 +306,29 @@ def parse_task(data):
 
     if not title or len(title) > 160:
         raise ValueError("Task title must be 1–160 characters.")
-
     if len(description) > 2000:
         raise ValueError("Notes must be 2,000 characters or fewer.")
-
     if len(category) > 40:
         raise ValueError("Category must be 40 characters or fewer.")
-
     if priority not in {"low", "medium", "high"}:
         raise ValueError("Choose a valid priority.")
 
-    if not isinstance(completed, bool):
-        raise ValueError("Invalid completion status.")
+    # Backward compatibility: older clients send only the completed boolean.
+    if status is None:
+        if not isinstance(completed, bool):
+            raise ValueError("Invalid completion status.")
+        status = "done" if completed else "todo"
+    elif not isinstance(status, str) or status not in {"todo", "in_progress", "done"}:
+        raise ValueError("Choose a valid task status.")
 
-    return (
-        title,
-        description,
-        category,
-        priority,
-        due_date,
-        int(completed),
-    )
+    completed_value = int(status == "done")
+    return (title, description, category, priority, due_date, status, completed_value)
 
 
 def task_dict(row):
     result = dict(row)
     result["completed"] = bool(result["completed"])
+    result.setdefault("status", "done" if result["completed"] else "todo")
     return result
 
 
@@ -455,7 +484,7 @@ def list_tasks():
         rows = db.execute(
             """
             SELECT id, title, description, category, priority,
-                   due_date, completed, created_at, updated_at
+                   due_date, completed, status, created_at, updated_at
             FROM tasks
             WHERE user_id = ?
             ORDER BY
@@ -488,8 +517,8 @@ def create_task():
             """
             INSERT INTO tasks
                 (user_id, title, description, category,
-                 priority, due_date, completed)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                 priority, due_date, status, completed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (g.user["id"], *values),
         )
@@ -523,6 +552,7 @@ def update_task(task_id):
                 category = ?,
                 priority = ?,
                 due_date = ?,
+                status = ?,
                 completed = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?
@@ -561,6 +591,103 @@ def delete_task(task_id):
         return error("Task not found.", 404)
 
     return jsonify(ok=True)
+
+
+
+# --------------------------------------------------
+# Focus Session API
+# All queries enforce ownership using the authenticated user ID.
+# --------------------------------------------------
+
+@app.get("/api/focus-sessions")
+@login_required
+def list_focus_sessions():
+    with database_connection() as db:
+        rows = db.execute(
+            """
+            SELECT fs.id, fs.task_id, fs.session_type,
+                   fs.duration_minutes, fs.completed_at,
+                   t.title AS task_title
+            FROM focus_sessions AS fs
+            LEFT JOIN tasks AS t
+                ON t.id = fs.task_id
+                AND t.user_id = fs.user_id
+            WHERE fs.user_id = ?
+            ORDER BY fs.completed_at DESC, fs.id DESC
+            LIMIT 100
+            """,
+            (g.user["id"],),
+        ).fetchall()
+
+    return jsonify(
+        sessions=[dict(row) for row in rows]
+    )
+
+
+@app.post("/api/focus-sessions")
+@login_required
+def create_focus_session():
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return error("Invalid focus session data.")
+
+    session_type = data.get("session_type")
+    duration = data.get("duration_minutes")
+    task_id = data.get("task_id")
+
+    if session_type not in ("focus", "short_break", "long_break"):
+        return error("Invalid session type.")
+
+    # Reject booleans and non-integer values.
+    if isinstance(duration, bool) or not isinstance(duration, int):
+        return error("Duration must be a whole number between 1 and 180 minutes.")
+
+    if not 1 <= duration <= 180:
+        return error("Duration must be a whole number between 1 and 180 minutes.")
+
+    if task_id is not None:
+        if isinstance(task_id, bool) or not isinstance(task_id, int) or task_id < 1:
+            return error("Invalid task ID.")
+
+        with database_connection() as db:
+            task = db.execute(
+                """
+                SELECT id
+                FROM tasks
+                WHERE id = ? AND user_id = ?
+                """,
+                (task_id, g.user["id"]),
+            ).fetchone()
+
+            if task is None:
+                return error("Task not found.", 404)
+
+    with database_connection() as db:
+        cursor = db.execute(
+            """
+            INSERT INTO focus_sessions
+                (user_id, task_id, session_type, duration_minutes)
+            VALUES (?, ?, ?, ?)
+            """,
+            (g.user["id"], task_id, session_type, duration),
+        )
+
+        row = db.execute(
+            """
+            SELECT fs.id, fs.task_id, fs.session_type,
+                   fs.duration_minutes, fs.completed_at,
+                   t.title AS task_title
+            FROM focus_sessions AS fs
+            LEFT JOIN tasks AS t
+                ON t.id = fs.task_id
+                AND t.user_id = fs.user_id
+            WHERE fs.id = ? AND fs.user_id = ?
+            """,
+            (cursor.lastrowid, g.user["id"]),
+        ).fetchone()
+
+    return jsonify(session=dict(row)), 201
 
 
 # --------------------------------------------------

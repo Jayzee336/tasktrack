@@ -15,7 +15,9 @@ const state = {
   deleting: false,
   authMode: "login",
   toastTimer: null,
-  togglingIds: new Set()
+  togglingIds: new Set(),
+  view: "list",
+  movingIds: new Set()
 };
 
 const esc = (value) =>
@@ -253,6 +255,10 @@ function visibleTasks() {
         task.due_date &&
         task.due_date > today &&
         !task.completed) ||
+      (state.filter === "overdue" &&
+        task.due_date &&
+        task.due_date < today &&
+        !task.completed) ||
       (state.filter === "completed" && task.completed);
 
     return matchesText && matchesPriority && matchesFilter;
@@ -263,15 +269,84 @@ function visibleTasks() {
 // TASK RENDERING
 // ========================================
 
+
+function normalizedStatus(task) {
+  if (task.status === "done" || task.completed) return "done";
+  if (task.status === "in_progress") return "in_progress";
+  return "todo";
+}
+
+function renderKanbanBoard(tasks) {
+  const columns = [
+    { status: "todo", title: "To Do", hint: "Ready when you are" },
+    { status: "in_progress", title: "In Progress", hint: "Work in motion" },
+    { status: "done", title: "Done", hint: "Look what you did" }
+  ];
+  $("#kanban-board").innerHTML = columns.map((column) => {
+    const items = tasks.filter((task) => normalizedStatus(task) === column.status);
+    return `<section class="kanban-column" data-status="${column.status}">
+      <header class="kanban-column-head"><div><h3>${column.title}</h3><p>${column.hint}</p></div><span class="kanban-count">${items.length}</span></header>
+      <div class="kanban-dropzone" data-drop-status="${column.status}">
+      ${items.map((task) => {
+        const priority = ["high", "medium", "low"].includes(task.priority) ? task.priority : "medium";
+        const due = task.due_date ? prettyDate(task.due_date) : "No due date";
+        const moving = state.movingIds.has(task.id);
+        return `<article class="kanban-card task-row ${task.completed ? "is-complete" : ""}" data-id="${esc(task.id)}" draggable="${moving ? "false" : "true"}">
+          <div class="kanban-card-top"><span class="pill ${priority}">${priority[0].toUpperCase()+priority.slice(1)}</span><span class="kanban-due">${esc(due)}</span></div>
+          <h4>${esc(task.title)}</h4>${task.description ? `<p class="kanban-description">${esc(task.description)}</p>` : ""}
+          <span class="category">${esc(task.category || "General")}</span>
+          <div class="kanban-card-bottom"><label class="kanban-status-label" for="status-${esc(task.id)}">Status</label>
+            <select id="status-${esc(task.id)}" class="kanban-status-select" data-action="status" aria-label="Status for ${esc(task.title)}" ${moving ? "disabled" : ""}>
+              <option value="todo" ${column.status === "todo" ? "selected" : ""}>To Do</option><option value="in_progress" ${column.status === "in_progress" ? "selected" : ""}>In Progress</option><option value="done" ${column.status === "done" ? "selected" : ""}>Done</option>
+            </select><div class="actions task-icon-actions"><button class="task-icon-btn edit-icon" data-action="edit" type="button" aria-label="Edit ${esc(task.title)}" title="Edit task">${icons.edit}</button><button class="task-icon-btn delete-icon" data-action="delete" type="button" aria-label="Delete ${esc(task.title)}" title="Delete task">${icons.delete}</button></div>
+          </div></article>`;
+      }).join("") || `<p class="kanban-empty">Drop a task here</p>`}
+      </div></section>`;
+  }).join("");
+}
+
+async function changeTaskStatus(taskId, status) {
+  const task = state.tasks.find((item) => item.id === taskId);
+  if (!task || state.movingIds.has(taskId)) return;
+  const previous = { status: normalizedStatus(task), completed: Boolean(task.completed) };
+  state.movingIds.add(taskId);
+  task.status = status;
+  task.completed = status === "done";
+  render();
+  try {
+    const data = await api(`/api/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ title: task.title, description: task.description || "", category: task.category || "General", priority: task.priority, due_date: task.due_date || null, status }) });
+    if (data.task) Object.assign(task, data.task);
+    toast(status === "done" ? "Task completed!" : status === "in_progress" ? "Task moved to In Progress." : "Task moved to To Do.");
+  } catch (error) {
+    task.status = previous.status;
+    task.completed = previous.completed;
+    toast(error.message || "Could not update task status.", true);
+  } finally {
+    state.movingIds.delete(taskId);
+    render();
+  }
+}
+
 function render() {
   const tasks = visibleTasks();
   const total = state.tasks.length;
   const completed = state.tasks.filter((task) => task.completed).length;
   const today = todayISO();
 
-  const dueToday = state.tasks.filter(
-    (task) => !task.completed && task.due_date === today
-  ).length;
+  const activeTasks = state.tasks.filter((task) => !task.completed);
+  const overdueTasks = activeTasks
+    .filter((task) => task.due_date && task.due_date < today)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const todayTasks = activeTasks
+    .filter((task) => task.due_date === today)
+    .sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.priority] ?? 1) - ({ high: 0, medium: 1, low: 2 }[b.priority] ?? 1));
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const nextWeekISO = `${nextWeek.getFullYear()}-${String(nextWeek.getMonth() + 1).padStart(2, "0")}-${String(nextWeek.getDate()).padStart(2, "0")}`;
+  const upcomingTasks = activeTasks.filter(
+    (task) => task.due_date && task.due_date > today && task.due_date <= nextWeekISO
+  );
+  const dueToday = todayTasks.length;
 
   const rate = total ? Math.round((completed / total) * 100) : 0;
 
@@ -287,11 +362,45 @@ function render() {
     all: "All tasks",
     today: "Due today",
     upcoming: "Upcoming",
+    overdue: "Overdue tasks",
     completed: "Completed"
   };
 
   $("#list-title").childNodes[0].textContent =
     `${titles[state.filter]} `;
+
+  $("#nav-overdue").textContent = overdueTasks.length;
+  $("#focus-date").textContent = new Date().toLocaleDateString(undefined, {
+    weekday: "short", month: "short", day: "numeric"
+  });
+  $("#focus-overdue-count").textContent = overdueTasks.length;
+  $("#focus-overdue-copy").textContent = overdueTasks.length
+    ? `${overdueTasks.length === 1 ? "Task is" : "Tasks are"} past the due date.`
+    : "No overdue tasks. Nice work.";
+  $("#focus-today-count").textContent = todayTasks.length;
+  $("#focus-today-copy").textContent = todayTasks.length
+    ? `${todayTasks.length} ${todayTasks.length === 1 ? "task needs" : "tasks need"} attention today.`
+    : "Nothing due today. Keep your pace.";
+  $("#focus-upcoming-count").textContent = upcomingTasks.length;
+  $("#focus-upcoming-copy").textContent = upcomingTasks.length
+    ? `Due between now and ${prettyDate(nextWeekISO)}.`
+    : "Your upcoming week is clear.";
+
+  const queueTasks = [...overdueTasks, ...todayTasks]
+    .filter((task, index, items) => items.findIndex((item) => item.id === task.id) === index)
+    .slice(0, 3);
+  $("#focus-queue-count").textContent = `${queueTasks.length} shown`;
+  $("#focus-queue-list").innerHTML = queueTasks.length
+    ? queueTasks.map((task) => {
+        const isOverdue = task.due_date < today;
+        const priority = ["high", "medium", "low"].includes(task.priority) ? task.priority : "medium";
+        return `<div class="focus-queue-item">
+          <span class="queue-priority ${priority}" aria-hidden="true"></span>
+          <div class="queue-task-copy"><strong>${esc(task.title)}</strong><small>${esc(task.category || "General")} · ${isOverdue ? `Overdue ${esc(prettyDate(task.due_date))}` : "Due today"}</small></div>
+          <span class="pill ${priority}">${priority[0].toUpperCase() + priority.slice(1)}</span>
+        </div>`;
+      }).join("")
+    : `<div class="focus-queue-empty"><span>✦</span><div><strong>You're clear for today</strong><small>Add a due date to a task to see it in your focus queue.</small></div></div>`;
 
   $("#task-list").innerHTML = tasks.map((task) => {
     const overdue =
@@ -379,9 +488,16 @@ function render() {
   }).join("");
 
   const empty = tasks.length === 0;
-
+  renderKanbanBoard(tasks);
+  const boardView = state.view === "board";
+  $("#list-view-btn").classList.toggle("active", !boardView);
+  $("#board-view-btn").classList.toggle("active", boardView);
+  $("#list-view-btn").setAttribute("aria-pressed", String(!boardView));
+  $("#board-view-btn").setAttribute("aria-pressed", String(boardView));
+  $(".table-head").hidden = boardView;
+  $("#task-list").hidden = boardView || empty;
+  $("#kanban-board").hidden = !boardView || empty;
   $("#empty-state").hidden = !empty;
-  $("#task-list").hidden = empty;
 
   if (empty) {
     const hasTasks = state.tasks.length > 0;
@@ -761,6 +877,35 @@ async function boot() {
   });
 
   $("#task-list").addEventListener("click", taskAction);
+  $("#kanban-board").addEventListener("click", taskAction);
+  $("#list-view-btn").addEventListener("click", () => { state.view = "list"; render(); });
+  $("#board-view-btn").addEventListener("click", () => { state.view = "board"; render(); });
+  $("#kanban-board").addEventListener("change", (event) => {
+    if (!event.target.matches('[data-action="status"]')) return;
+    const card = event.target.closest(".task-row");
+    if (card) changeTaskStatus(Number(card.dataset.id), event.target.value);
+  });
+  $("#kanban-board").addEventListener("dragstart", (event) => {
+    const card = event.target.closest(".kanban-card");
+    if (!card || state.movingIds.has(Number(card.dataset.id))) { event.preventDefault(); return; }
+    event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", card.dataset.id); card.classList.add("is-dragging");
+  });
+  $("#kanban-board").addEventListener("dragend", (event) => {
+    const card = event.target.closest(".kanban-card"); if (card) card.classList.remove("is-dragging");
+    document.querySelectorAll(".kanban-dropzone.is-over").forEach((zone) => zone.classList.remove("is-over"));
+  });
+  $("#kanban-board").addEventListener("dragover", (event) => {
+    const zone = event.target.closest("[data-drop-status]"); if (!zone) return;
+    event.preventDefault(); event.dataTransfer.dropEffect = "move"; zone.classList.add("is-over");
+  });
+  $("#kanban-board").addEventListener("dragleave", (event) => {
+    const zone = event.target.closest("[data-drop-status]"); if (zone && !zone.contains(event.relatedTarget)) zone.classList.remove("is-over");
+  });
+  $("#kanban-board").addEventListener("drop", (event) => {
+    const zone = event.target.closest("[data-drop-status]"); if (!zone) return;
+    event.preventDefault(); zone.classList.remove("is-over");
+    const id = Number(event.dataTransfer.getData("text/plain")); if (Number.isFinite(id)) changeTaskStatus(id, zone.dataset.dropStatus);
+  });
 
   $("#task-list").addEventListener("change", (event) => {
     if (event.target.matches('[data-action="toggle"]')) {
@@ -772,6 +917,16 @@ async function boot() {
     button.addEventListener("click", () => {
       state.filter = button.dataset.filter;
       render();
+    });
+  });
+
+  document.querySelectorAll("[data-focus-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.filter = button.dataset.focusFilter;
+      $("#search").value = "";
+      state.search = "";
+      render();
+      $(".task-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
 

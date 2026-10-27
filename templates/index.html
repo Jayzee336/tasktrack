@@ -24,6 +24,11 @@
     src="{{ url_for('static', filename='app.js') }}"
     defer
   ></script>
+
+  <script
+  src="{{ url_for('static', filename='focus.js') }}"
+  defer
+></script>
 </head>
 
 <body>
@@ -198,6 +203,15 @@
 
         <button
           class="nav"
+          data-filter="overdue"
+          type="button"
+        >
+          ! <span>Overdue</span>
+          <b id="nav-overdue">0</b>
+        </button>
+
+        <button
+          class="nav"
           data-filter="upcoming"
           type="button"
         >
@@ -327,6 +341,124 @@
       </section>
 
 
+      <!-- Command Center / Focus Today -->
+      <section class="focus-panel glass" aria-labelledby="focus-heading">
+        <div class="focus-heading">
+          <div>
+            <span class="eyebrow">COMMAND CENTER</span>
+            <h2 id="focus-heading">Focus today <span id="focus-date"></span></h2>
+            <p class="focus-subtitle">A clear next step is better than a perfect plan.</p>
+          </div>
+          <button class="btn secondary focus-view" type="button" data-focus-filter="today">View today's tasks ↗</button>
+        </div>
+
+        <div class="focus-grid">
+          <article class="focus-metric focus-overdue">
+            <div class="focus-metric-top"><span class="focus-dot"></span><span>Needs attention</span></div>
+            <strong id="focus-overdue-count">0</strong>
+            <p id="focus-overdue-copy">No overdue tasks. Nice work.</p>
+            <button type="button" data-focus-filter="overdue">Review overdue ↗</button>
+          </article>
+          <article class="focus-metric focus-today">
+            <div class="focus-metric-top"><span class="focus-dot"></span><span>Due today</span></div>
+            <strong id="focus-today-count">0</strong>
+            <p id="focus-today-copy">Nothing due today. Keep your pace.</p>
+            <button type="button" data-focus-filter="today">See today's plan ↗</button>
+          </article>
+          <article class="focus-metric focus-upcoming">
+            <div class="focus-metric-top"><span class="focus-dot"></span><span>Next 7 days</span></div>
+            <strong id="focus-upcoming-count">0</strong>
+            <p id="focus-upcoming-copy">Your upcoming week is clear.</p>
+            <button type="button" data-focus-filter="upcoming">Plan ahead ↗</button>
+          </article>
+        </div>
+
+        <div class="focus-queue">
+          <div class="focus-queue-heading">
+            <div><span class="eyebrow">YOUR NEXT STEPS</span><h3>Priority queue</h3></div>
+            <span id="focus-queue-count" class="queue-count">0 tasks</span>
+          </div>
+          <div id="focus-queue-list" class="focus-queue-list"></div>
+        </div>
+      </section>
+
+      
+<!-- Focus Session -->
+<section class="focus-session-panel glass" aria-labelledby="focus-session-heading">
+  <div class="focus-session-header">
+    <div>
+      <span class="eyebrow">DEEP WORK</span>
+      <h2 id="focus-session-heading">Focus Session</h2>
+      <p class="focus-session-subtitle">
+        One task at a time. Protect your attention and build momentum.
+      </p>
+    </div>
+    <span id="focus-session-status" class="focus-session-status" role="status">
+      Ready to focus
+    </span>
+  </div>
+
+  <div class="focus-session-layout">
+    <div class="focus-session-clock">
+      <div class="focus-session-type" id="focus-session-type-label">FOCUS TIME</div>
+      <div class="focus-session-time" id="focus-session-time" aria-live="off">25:00</div>
+      <p id="focus-session-message" class="focus-session-message">
+        Choose a task, then start your session.
+      </p>
+
+      <div class="focus-session-controls">
+        <button id="focus-session-start" class="btn primary" type="button">
+          Start focus
+        </button>
+        <button id="focus-session-reset" class="btn secondary" type="button">
+          Reset
+        </button>
+      </div>
+    </div>
+
+    <div class="focus-session-options">
+      <label for="focus-session-kind">Session type</label>
+      <select id="focus-session-kind">
+        <option value="focus">Focus</option>
+        <option value="short_break">Short break</option>
+        <option value="long_break">Long break</option>
+      </select>
+
+      <label for="focus-session-duration">Duration</label>
+      <select id="focus-session-duration">
+        <option value="25">25 minutes</option>
+        <option value="45">45 minutes</option>
+        <option value="60">60 minutes</option>
+        <option value="5">5 minutes</option>
+        <option value="15">15 minutes</option>
+      </select>
+
+      <label for="focus-session-task">Link to a task (optional)</label>
+      <select id="focus-session-task">
+        <option value="">No linked task</option>
+      </select>
+
+      <div class="focus-session-note">
+        <strong>Small steps count.</strong>
+        <span>Only completed sessions are added to your history.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="focus-history">
+    <div class="focus-history-heading">
+      <div>
+        <span class="eyebrow">YOUR PROGRESS</span>
+        <h3>Recent sessions</h3>
+      </div>
+      <span id="focus-history-count" class="queue-count">0 sessions</span>
+    </div>
+    <div id="focus-session-history" class="focus-session-history">
+      <p class="focus-history-empty">Your completed sessions will appear here.</p>
+    </div>
+  </div>
+</section>
+
       <!-- Task list -->
       <section class="task-panel glass">
 
@@ -357,6 +489,10 @@
               <option value="low">Low priority</option>
             </select>
           </div>
+          <div class="view-switch" role="group" aria-label="Task view">
+            <button type="button" id="list-view-btn" class="view-switch-btn active" aria-pressed="true">List</button>
+            <button type="button" id="board-view-btn" class="view-switch-btn" aria-pressed="false">Board</button>
+          </div>
         </div>
 
         <div class="table-head" aria-hidden="true">
@@ -368,6 +504,7 @@
         </div>
 
         <div id="task-list"></div>
+        <div id="kanban-board" class="kanban-board" hidden aria-label="Kanban board"></div>
 
         <div id="empty-state" class="empty" hidden>
           <div class="empty-icon" aria-hidden="true">✳</div>
