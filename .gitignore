@@ -8,3 +8,4 @@ instance/
 *.db
 .pytest_cache/
 .coverage
+test_scripts_backup/
