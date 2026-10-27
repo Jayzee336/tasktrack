@@ -550,7 +550,7 @@ function render() {
 // CREATE / EDIT TASK MODAL
 // ========================================
 
-function openModal(task = null) {
+function openModal(task = null, selectedDueDate = "") {
   closeDeleteModal();
 
   state.editingId = task ? task.id : null;
@@ -568,7 +568,7 @@ function openModal(task = null) {
     task?.category === "General" ? "" : task?.category || "";
 
   $("#task-priority").value = task?.priority || "medium";
-  $("#task-due").value = task?.due_date || "";
+  $("#task-due").value = task?.due_date || selectedDueDate || "";
 
   $("#modal").hidden = false;
   document.body.style.overflow = "hidden";
@@ -916,18 +916,17 @@ function renderBreakdown(selector, items, labelKey) {
     container.innerHTML = '<p class="insight-empty">Add tasks to see your breakdown.</p>';
     return;
   }
-  const maximum = Math.max(1, ...items.map((item) => Number(item.total) || 0));
   container.innerHTML = items.map((item) => {
     const total = Number(item.total) || 0;
     const completed = Number(item.completed) || 0;
-    const width = total ? Math.round(total / maximum * 100) : 0;
+    const completionPercent = total ? Math.round(completed / total * 100) : 0;
     const label = String(item[labelKey] || "General");
     return `<div class="insight-breakdown-row">
       <div class="insight-breakdown-copy"><span>${esc(label)}</span><strong>${completed}/${total}</strong></div>
       <div class="insight-breakdown-track" role="img" aria-label="${esc(label)}: ${completed} completed out of ${total}">
-        <span style="width:${width}%"></span>
+        <span style="width:${completionPercent}%"></span>
       </div>
-      <small>${total ? Math.round(completed / total * 100) : 0}% completed</small>
+      <small>${completionPercent}% completed</small>
     </div>`;
   }).join("");
 }
@@ -1149,7 +1148,15 @@ async function boot() {
     if (task) openModal(task);
   });
 
+  document.addEventListener("tasktrack:calendar-date-selected", (event) => {
+    if (!state.user) return;
+    const selectedDate = String(event.detail?.date || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) return;
+    openModal(null, selectedDate);
+  });
+
   $("#new-task").addEventListener("click", () => openModal());
+  $("#new-task-inline").addEventListener("click", () => openModal());
   $("#empty-create").addEventListener("click", () => openModal());
 
   $("#close-modal").addEventListener("click", closeModal);

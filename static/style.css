@@ -3977,3 +3977,150 @@ kbd {
   .insight-chart-grid, .insight-breakdown-grid { grid-template-columns: 1fr; }
   .insight-chart-card, .insight-breakdown-card { padding: 14px; }
 }
+
+
+/* Phase 06 polish — clearer calendar planning and task creation */
+.calendar-planning-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.calendar-add-task {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.calendar-month-panel,
+.calendar-deadlines-panel {
+  min-width: 0;
+}
+.calendar-day {
+  position: relative;
+  text-align: left;
+  transition: border-color var(--transition), background var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+.calendar-day:hover {
+  border-color: rgba(169,155,255,.42);
+  background: rgba(169,155,255,.055);
+}
+.calendar-day.is-selected {
+  border-color: #9481ff;
+  background: rgba(121,88,255,.17);
+  box-shadow: inset 0 0 0 1px rgba(169,155,255,.14);
+}
+.calendar-day-number {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+}
+.calendar-day-add {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid rgba(169,155,255,.19);
+  border-radius: 6px;
+  color: var(--purple);
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity var(--transition), transform var(--transition);
+}
+.calendar-day:hover .calendar-day-add,
+.calendar-day:focus-visible .calendar-day-add,
+.calendar-day.is-selected .calendar-day-add {
+  opacity: 1;
+  transform: translateY(0);
+}
+.calendar-day.is-week-view {}
+.calendar-grid.is-week-view .calendar-day {
+  min-height: 166px;
+  padding: 10px 9px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.018));
+}
+.calendar-grid.is-week-view .calendar-day.is-today {
+  background: linear-gradient(180deg, rgba(121,88,255,.18), rgba(121,88,255,.08));
+}
+.calendar-grid.is-week-view .calendar-day-number {
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.calendar-grid.is-week-view .calendar-day-task {
+  padding: 5px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+}
+.calendar-grid.is-week-view .calendar-day-tasks {
+  gap: 5px;
+}
+.calendar-grid.is-week-view .calendar-day-more {
+  padding: 2px 3px;
+  font-size: 10px;
+}
+.task-panel-title-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: max-content;
+}
+.task-inline-create {
+  min-height: 35px;
+  padding: 8px 11px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.insight-breakdown-track {
+  position: relative;
+  background: rgba(104,119,157,.19);
+}
+.insight-breakdown-track span {
+  min-width: 0;
+  background: linear-gradient(90deg, #4eaf91, #80e5c0);
+  transition: width .25s ease;
+}
+@media (max-width: 1150px) {
+  .panel-head {
+    flex-wrap: wrap;
+  }
+  .task-panel-title-tools {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+  .controls {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 850px) {
+  .calendar-planning-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .calendar-grid.is-week-view .calendar-day {
+    min-height: 132px;
+    padding: 8px 5px;
+  }
+}
+@media (max-width: 560px) {
+  .calendar-grid {
+    gap: 3px;
+  }
+  .calendar-grid.is-week-view .calendar-day {
+    min-height: 112px;
+    padding: 6px 3px;
+  }
+  .calendar-grid.is-week-view .calendar-day-task {
+    font-size: 9px;
+    padding: 4px 3px;
+  }
+  .calendar-day-add {
+    width: 15px;
+    height: 15px;
+  }
+  .task-panel-title-tools {
+    flex-wrap: wrap;
+    min-width: 0;
+    width: 100%;
+  }
+}

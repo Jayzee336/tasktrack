@@ -129,7 +129,8 @@
     const isOverdue = iso < todayISO() && activeTasks.length > 0;
     const isSelected = iso === calendarState.selectedDate;
     const isToday = iso === todayISO();
-    const taskMarkup = tasks.slice(0, 2).map((task) => {
+    const taskLimit = calendarState.view === "week" ? 4 : 2;
+    const taskMarkup = tasks.slice(0, taskLimit).map((task) => {
       const completed = task.completed || task.status === "done";
       const draggable = !completed;
       return `
@@ -141,8 +142,8 @@
         </span>
       `;
     }).join("");
-    const extra = tasks.length > 2
-      ? `<span class="calendar-day-more">+${tasks.length - 2} more</span>`
+    const extra = tasks.length > taskLimit
+      ? `<span class="calendar-day-more">+${tasks.length - taskLimit} more</span>`
       : "";
     const dateLabel = formatDate(iso);
 
@@ -153,7 +154,7 @@
         aria-label="Select ${escapeHTML(dateLabel)}; ${tasks.length} tasks"
         aria-pressed="${isSelected}"
         title="Create a task due ${escapeHTML(dateLabel)}">
-        <span class="calendar-day-number">${parseISO(iso).getDate()}</span>
+        <span class="calendar-day-number">${parseISO(iso).getDate()}<span class="calendar-day-add" aria-hidden="true">+</span></span>
         <span class="calendar-day-tasks">${taskMarkup}${extra}</span>
       </button>
     `;
@@ -343,7 +344,7 @@
       const selected = parseISO(date);
       calendarState.month = new Date(selected.getFullYear(), selected.getMonth(), 1);
       renderCalendar();
-      showFeedback("Selected " + formatDate(date) + ". Create a task or drop an active task here to reschedule it.");
+      showFeedback("Create a task due " + formatDate(date) + ", or drag an active task here to reschedule it.");
       document.dispatchEvent(new CustomEvent("tasktrack:calendar-date-selected", {
         detail: { date }
       }));
@@ -416,6 +417,13 @@
     });
     $("#calendar-month-view")?.addEventListener("click", () => switchView("month"));
     $("#calendar-week-view")?.addEventListener("click", () => switchView("week"));
+    $("#calendar-add-task")?.addEventListener("click", () => {
+      const date = calendarState.selectedDate || todayISO();
+      showFeedback("Create a task due " + formatDate(date) + ".");
+      document.dispatchEvent(new CustomEvent("tasktrack:calendar-date-selected", {
+        detail: { date }
+      }));
+    });
 
     document.addEventListener("tasktrack:tasks-updated", () => {
       loadCalendarTasks().catch((error) => {
