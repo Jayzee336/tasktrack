@@ -3476,3 +3476,54 @@ select {
     padding: 7px 9px;
   }
 }
+/* Interactive calendar dates */
+.calendar-day-number {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendar-day-number:hover {
+  color: #c7baff;
+  text-decoration: underline;
+}
+
+.calendar-day-number:focus-visible {
+  outline: 2px solid #7958ff;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.calendar-day.is-selected {
+  border-color: #7958ff;
+  background: rgba(121, 88, 255, 0.16);
+}
+
+.calendar-day.is-selected .calendar-day-number {
+  color: #c7baff;
+}
+/* Keep today's date visually distinct from the selected date */
+.calendar-day.is-today:not(.is-selected) {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.05);
+  box-shadow: none;
+}
+
+.calendar-day.is-today:not(.is-selected) .calendar-day-number {
+  color: var(--text, #eef1ff);
+}
+
+/* Only the selected date gets the strong purple highlight */
+.calendar-day.is-selected {
+  border-color: #7958ff;
+  background: rgba(121, 88, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(121, 88, 255, 0.25);
+}
+
+.calendar-day.is-selected .calendar-day-number {
+  color: #c7baff;
+}
