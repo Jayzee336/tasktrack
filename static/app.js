@@ -686,20 +686,15 @@ async function taskAction(event) {
   state.togglingIds.add(taskId);
   button.disabled = true;
 
+  // Update the interface immediately.
+  task.completed = completed;
+  render();
+
   try {
     await api(`/api/tasks/${taskId}`, {
       method: "PATCH",
       body: JSON.stringify(payload)
     });
-
-    task.completed = completed;
-
-    try {
-      await loadTasks();
-    } catch (error) {
-      toast("Task updated, but the list could not refresh.", true);
-      return;
-    }
 
     toast(
       completed
@@ -707,11 +702,11 @@ async function taskAction(event) {
         : "Task moved back to active."
     );
   } catch (error) {
+    // Restore the previous state if the server rejects the update.
     task.completed = previousCompleted;
+    render();
 
     toast(error.message || "Could not update the task.", true);
-
-    render();
   } finally {
     state.togglingIds.delete(taskId);
   }
