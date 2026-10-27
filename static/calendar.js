@@ -93,7 +93,7 @@
     const visible = [...overdue, ...upcoming].slice(0, 8);
 
     if (!visible.length) {
-      container.innerHTML = '<div class="calendar-empty"><strong>You're all caught up.</strong><span>Tasks with deadlines will appear here.</span></div>';
+      container.innerHTML = "<div class=\"calendar-empty\"><strong>You're all caught up.</strong><span>Tasks with deadlines will appear here.</span></div>";
       return;
     }
 
