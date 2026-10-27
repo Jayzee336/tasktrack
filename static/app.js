@@ -979,6 +979,9 @@ async function loadInsights() {
 document.addEventListener("tasktrack:tasks-updated", () => {
   if (state.user) void loadInsights();
 });
+document.addEventListener("tasktrack:focus-session-added", () => {
+  if (state.user) void loadInsights();
+});
 
 function clearAllFilters() {
   state.filter = "all";

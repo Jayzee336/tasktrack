@@ -250,6 +250,7 @@
       setStatus("Session completed");
       messageDisplay.textContent = "Well done! Your session was saved.";
       await loadHistory();
+      document.dispatchEvent(new Event("tasktrack:focus-session-added"));
     } catch (error) {
       completedPendingSave = session;
       setStatus("Save failed");

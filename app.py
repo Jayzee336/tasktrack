@@ -2,7 +2,7 @@ import os
 import re
 import sqlite3
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, timedelta
 from functools import wraps
 from pathlib import Path
 
@@ -616,7 +616,7 @@ def productivity_insights():
     """Return per-user productivity aggregates for the dashboard."""
     today = date.today()
     today_iso = today.isoformat()
-    week_start = today - __import__("datetime").timedelta(days=6)
+    week_start = today - timedelta(days=6)
     week_start_iso = week_start.isoformat()
     month_start_iso = today.replace(day=1).isoformat()
 
@@ -676,7 +676,7 @@ def productivity_insights():
 
     weekly_completions = []
     for offset in range(7):
-        day = week_start + __import__("datetime").timedelta(days=offset)
+        day = week_start + timedelta(days=offset)
         weekly_completions.append({
             "date": day.isoformat(),
             "label": day.strftime("%a"),
@@ -721,19 +721,19 @@ def productivity_insights():
     ]
 
     # Current streak continues if the latest completion was today or yesterday.
-    streak_anchor = today_iso if today_iso in completion_dates else (today - __import__("datetime").timedelta(days=1)).isoformat()
+    streak_anchor = today_iso if today_iso in completion_dates else (today - timedelta(days=1)).isoformat()
     current_streak = 0
     cursor_day = date.fromisoformat(streak_anchor)
     while cursor_day.isoformat() in completion_dates:
         current_streak += 1
-        cursor_day -= __import__("datetime").timedelta(days=1)
+        cursor_day -= timedelta(days=1)
 
     longest_streak = 0
     running_streak = 0
     previous_day = None
     for day_text in sorted(completion_dates):
         this_day = date.fromisoformat(day_text)
-        if previous_day is not None and this_day == previous_day + __import__("datetime").timedelta(days=1):
+        if previous_day is not None and this_day == previous_day + timedelta(days=1):
             running_streak += 1
         else:
             running_streak = 1
