@@ -863,6 +863,12 @@ async function boot() {
       password.type === "password" ? "Show" : "Hide";
   });
 
+  document.addEventListener("tasktrack:calendar-task-selected", (event) => {
+    const taskId = Number(event.detail?.taskId);
+    const task = state.tasks.find((item) => Number(item.id) === taskId);
+    if (task) openModal(task);
+  });
+
   $("#new-task").addEventListener("click", () => openModal());
   $("#empty-create").addEventListener("click", () => openModal());
 

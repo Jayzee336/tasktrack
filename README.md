@@ -22,23 +22,36 @@ TaskTrack is developed locally on Windows and is intended to be deployed to an U
 ```text
 tasktrack/
 ├── app.py
-├── requirements.txt
-├── .gitignore
 ├── README.md
+├── requirements.txt
+├── pytest.ini
+├── conftest.py
+├── .gitignore
 ├── templates/
 │   └── index.html
 ├── static/
 │   ├── app.js
+│   ├── calendar.js
+│   ├── focus.js
 │   └── style.css
-├── deploy/
-│   ├── tasktrack.service
-│   └── tasktrack.nginx
-├── instance/
-│   └── tasktrack.sqlite3
-└── .env
+├── tests/
+│   ├── test_auth.py
+│   ├── test_csrf.py
+│   ├── test_focus_sessions.py
+│   ├── test_health.py
+│   ├── test_ownership.py
+│   └── test_validation.py
+└── deploy/
+    ├── tasktrack.service
+    └── tasktrack.nginx
 ```
 
-The actual project may also contain diagnostic and testing scripts, such as `test_auth.py`, `test_csrf.py`, `test_ownership.py`, `inspect_db.py`, `view_db.py`, and `check_passwords.py`.
+- `app.py` provides the Flask API, authentication, persistence, validation, and security controls.
+- `static/app.js` implements task management and the Kanban/list views.
+- `static/focus.js` provides Focus Mode and session history.
+- `static/calendar.js` provides month/week planning, deadline summaries, and drag-and-drop rescheduling.
+- `tests/` contains the automated pytest suite. Local database inspection scripts are intentionally not tracked.
+- `deploy/` contains deployment examples that must be reviewed before use.
 
 ## 3. Which Files Should Be Transferred to Ubuntu?
 
@@ -64,7 +77,7 @@ The `deploy/` directory contains deployment configuration examples. Review and a
 | `instance/tasktrack.sqlite3` | Create a new database or transfer it separately if existing data must be preserved. |
 | `deploy/tasktrack.service` | Review paths, user, environment file, and Gunicorn command before installation. |
 | `deploy/tasktrack.nginx` | Review and adapt the configuration to the existing Nginx setup. |
-| Test and diagnostic scripts | Optional. Transfer only if needed for testing or troubleshooting. |
+| `tests/`, `conftest.py`, and `pytest.ini` | Keep for local regression testing; install the requirements and run `python -m pytest -q`. |
 
 **Important:** The current SQLite database contains development/test data. Do not transfer it unless you intentionally want to preserve that data. If you need to keep existing records, make a separate backup first.
 

@@ -3476,37 +3476,7 @@ select {
     padding: 7px 9px;
   }
 }
-/* Interactive calendar dates */
-.calendar-day-number {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.calendar-day-number:hover {
-  color: #c7baff;
-  text-decoration: underline;
-}
-
-.calendar-day-number:focus-visible {
-  outline: 2px solid #7958ff;
-  outline-offset: 3px;
-  border-radius: 4px;
-}
-
-.calendar-day.is-selected {
-  border-color: #7958ff;
-  background: rgba(121, 88, 255, 0.16);
-}
-
-.calendar-day.is-selected .calendar-day-number {
-  color: #c7baff;
-}
-/* Keep today's date visually distinct from the selected date */
+/* Calendar date selection and interactions */
 .calendar-day.is-today:not(.is-selected) {
   border-color: rgba(148, 163, 184, 0.35);
   background: rgba(148, 163, 184, 0.05);
@@ -3526,4 +3496,127 @@ select {
 
 .calendar-day.is-selected .calendar-day-number {
   color: #c7baff;
+}
+
+/* Phase 04: month/week controls and calendar rescheduling */
+.calendar-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border, rgba(255,255,255,.12));
+  border-radius: 10px;
+  background: rgba(255,255,255,.035);
+}
+
+.calendar-view-btn {
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted, #a8b0cc);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.calendar-view-btn:hover,
+.calendar-view-btn.is-active {
+  background: rgba(121,88,255,.2);
+  color: var(--text, #eef1ff);
+}
+
+.calendar-day:not(.is-empty) {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  color: var(--text, #eef1ff);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+.calendar-day:not(.is-empty):hover {
+  border-color: rgba(121,88,255,.8);
+  background: rgba(121,88,255,.1);
+}
+
+.calendar-day:not(.is-empty):focus-visible {
+  outline: 2px solid #7958ff;
+  outline-offset: 2px;
+  position: relative;
+  z-index: 1;
+}
+
+.calendar-day.is-selected {
+  border-color: #7958ff;
+  background: rgba(121,88,255,.18);
+  box-shadow: inset 0 0 0 1px rgba(121,88,255,.25);
+}
+
+.calendar-day.is-selected .calendar-day-number {
+  color: #c7baff;
+}
+
+.calendar-day.is-today:not(.is-selected) {
+  border-color: rgba(148,163,184,.35);
+  background: rgba(148,163,184,.05);
+  box-shadow: none;
+}
+
+.calendar-day.is-today:not(.is-selected) .calendar-day-number {
+  color: var(--text, #eef1ff);
+}
+
+.calendar-day-task[draggable="true"] {
+  cursor: grab;
+  user-select: none;
+}
+
+.calendar-day-task[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.calendar-day-task.is-dragging {
+  opacity: .45;
+}
+
+.calendar-day.is-drop-target {
+  border-color: rgba(112,223,186,.95);
+  background: rgba(112,223,186,.13);
+  box-shadow: inset 0 0 0 1px rgba(112,223,186,.35);
+}
+
+.calendar-feedback {
+  min-height: 15px;
+  margin: 9px 2px 0;
+  color: var(--muted, #a8b0cc);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.calendar-feedback.is-error {
+  color: var(--red, #ff7188);
+}
+
+.calendar-grid.is-week-view .calendar-day {
+  min-height: 145px;
+}
+
+@media (max-width: 700px) {
+  .calendar-toolbar-actions {
+    flex-wrap: wrap;
+  }
+
+  .calendar-view-btn {
+    padding-inline: 7px;
+  }
+
+  .calendar-grid.is-week-view .calendar-day {
+    min-height: 100px;
+  }
 }

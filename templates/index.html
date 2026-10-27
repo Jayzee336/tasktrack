@@ -400,14 +400,19 @@
   <div class="calendar-planning-layout">
     <div class="calendar-month-panel">
       <div class="calendar-toolbar">
-        <h3 id="calendar-month-label">Loading month…</h3>
+        <h3 id="calendar-month-label">Loading calendar…</h3>
         <div class="calendar-toolbar-actions">
+          <div class="calendar-view-switch" role="group" aria-label="Calendar view">
+            <button id="calendar-month-view" class="calendar-view-btn is-active" type="button" aria-pressed="true">Month</button>
+            <button id="calendar-week-view" class="calendar-view-btn" type="button" aria-pressed="false">Week</button>
+          </div>
           <button id="calendar-today" class="btn secondary" type="button">Today</button>
-          <button id="calendar-prev" class="calendar-nav-btn" type="button" aria-label="Previous month">‹</button>
-          <button id="calendar-next" class="calendar-nav-btn" type="button" aria-label="Next month">›</button>
+          <button id="calendar-prev" class="calendar-nav-btn" type="button" aria-label="Previous month or week">‹</button>
+          <button id="calendar-next" class="calendar-nav-btn" type="button" aria-label="Next month or week">›</button>
         </div>
       </div>
       <div id="calendar-grid" class="calendar-grid" aria-live="polite"></div>
+      <p id="calendar-feedback" class="calendar-feedback" role="status" aria-live="polite"></p>
     </div>
 
     <aside class="calendar-deadlines-panel" aria-labelledby="calendar-deadlines-heading">
