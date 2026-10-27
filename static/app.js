@@ -231,6 +231,8 @@ async function loadTasks() {
   state.tasks = Array.isArray(data.tasks) ? data.tasks : [];
 
   render();
+
+  document.dispatchEvent(new Event("tasktrack:tasks-updated"));
 }
 
 function visibleTasks() {
@@ -316,7 +318,16 @@ async function changeTaskStatus(taskId, status) {
   try {
     const data = await api(`/api/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ title: task.title, description: task.description || "", category: task.category || "General", priority: task.priority, due_date: task.due_date || null, status }) });
     if (data.task) Object.assign(task, data.task);
-    toast(status === "done" ? "Task completed!" : status === "in_progress" ? "Task moved to In Progress." : "Task moved to To Do.");
+
+document.dispatchEvent(new Event("tasktrack:tasks-updated"));
+
+toast(
+  status === "done"
+    ? "Task completed!"
+    : status === "in_progress"
+      ? "Task moved to In Progress."
+      : "Task moved to To Do."
+);
   } catch (error) {
     task.status = previous.status;
     task.completed = previous.completed;
@@ -647,7 +658,8 @@ async function confirmDeleteTask() {
     document.body.style.overflow = "";
 
     render();
-    toast("Task deleted successfully.");
+document.dispatchEvent(new Event("tasktrack:tasks-updated"));
+toast("Task deleted successfully.");
   } catch (error) {
     $("#delete-task-error").textContent =
       error.message || "Unable to delete this task. Please try again.";
@@ -808,15 +820,17 @@ async function taskAction(event) {
 
   try {
     await api(`/api/tasks/${taskId}`, {
-      method: "PATCH",
-      body: JSON.stringify(payload)
-    });
+  method: "PATCH",
+  body: JSON.stringify(payload)
+});
 
-    toast(
-      completed
-        ? "Nice work—task completed!"
-        : "Task moved back to active."
-    );
+document.dispatchEvent(new Event("tasktrack:tasks-updated"));
+
+toast(
+  completed
+    ? "Nice work—task completed!"
+    : "Task moved back to active."
+);
   } catch (error) {
     // Restore the previous state if the server rejects the update.
     task.completed = previousCompleted;

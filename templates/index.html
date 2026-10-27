@@ -29,6 +29,11 @@
   src="{{ url_for('static', filename='focus.js') }}"
   defer
 ></script>
+
+<script
+  src="{{ url_for('static', filename='calendar.js') }}"
+  defer
+></script>
 </head>
 
 <body>
@@ -381,7 +386,43 @@
           <div id="focus-queue-list" class="focus-queue-list"></div>
         </div>
       </section>
+     
+<!-- Calendar and Planning -->
+<section class="calendar-planning-panel glass" aria-labelledby="calendar-heading">
+  <div class="calendar-planning-header">
+    <div>
+      <span class="eyebrow">PLAN AHEAD</span>
+      <h2 id="calendar-heading">Calendar &amp; deadlines</h2>
+      <p class="calendar-subtitle">See what's due and plan your next steps.</p>
+    </div>
+  </div>
 
+  <div class="calendar-planning-layout">
+    <div class="calendar-month-panel">
+      <div class="calendar-toolbar">
+        <h3 id="calendar-month-label">Loading month…</h3>
+        <div class="calendar-toolbar-actions">
+          <button id="calendar-today" class="btn secondary" type="button">Today</button>
+          <button id="calendar-prev" class="calendar-nav-btn" type="button" aria-label="Previous month">‹</button>
+          <button id="calendar-next" class="calendar-nav-btn" type="button" aria-label="Next month">›</button>
+        </div>
+      </div>
+      <div id="calendar-grid" class="calendar-grid" aria-live="polite"></div>
+    </div>
+
+    <aside class="calendar-deadlines-panel" aria-labelledby="calendar-deadlines-heading">
+      <div class="calendar-deadlines-header">
+        <div>
+          <span class="eyebrow">STAY ON TRACK</span>
+          <h3 id="calendar-deadlines-heading">Upcoming deadlines</h3>
+        </div>
+      </div>
+      <div id="calendar-deadlines" class="calendar-deadlines-list">
+        <p class="calendar-empty">Loading deadlines…</p>
+      </div>
+    </aside>
+  </div>
+</section>
       
 <!-- Focus Session -->
 <section class="focus-session-panel glass" aria-labelledby="focus-session-heading">
