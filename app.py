@@ -1,6 +1,7 @@
 import os
 import re
 import sqlite3
+from contextlib import contextmanager
 from datetime import date
 from functools import wraps
 from pathlib import Path
@@ -68,9 +69,20 @@ def connect_db():
     db.execute("PRAGMA busy_timeout = 10000")
     return db
 
+@contextmanager
+def database_connection():
+    """Manage a SQLite connection and always close it."""
+    db = connect_db()
+
+    try:
+        with db:
+            yield db
+    finally:
+        db.close()
+
 
 def init_db():
-    with connect_db() as db:
+    with database_connection() as db:
         db.executescript(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -164,7 +176,7 @@ def load_user():
     user_id = session.get("user_id")
 
     if user_id is not None:
-        with connect_db() as db:
+        with database_connection() as db:
             g.user = db.execute(
                 "SELECT id, email FROM users WHERE id = ?",
                 (user_id,),
@@ -228,14 +240,32 @@ def parse_task(data):
     description = data.get("description", "")
     category = data.get("category", "General")
     priority = data.get("priority", "medium")
-    due_date = data.get("due_date") or None
+    due_date = data.get("due_date")
     completed = data.get("completed", False)
 
-    if not all(
-        isinstance(value, str)
-        for value in (title, description, category, priority)
-    ):
-        raise ValueError("Invalid field type.")
+    if not isinstance(title, str):
+        raise ValueError("Task title must be 1–160 characters.")
+
+    if not isinstance(description, str):
+        raise ValueError("Notes must be text.")
+
+    if not isinstance(category, str):
+        raise ValueError("Category must be text.")
+
+    if not isinstance(priority, str):
+        raise ValueError("Choose a valid priority.")
+
+    if due_date == "":
+        due_date = None
+
+    if due_date is not None:
+        if not isinstance(due_date, str):
+            raise ValueError("Due date must be a valid date.")
+
+        try:
+            date.fromisoformat(due_date)
+        except ValueError:
+            raise ValueError("Due date must be a valid date.")
 
     title = title.strip()
     description = description.strip()
@@ -253,15 +283,6 @@ def parse_task(data):
 
     if priority not in {"low", "medium", "high"}:
         raise ValueError("Choose a valid priority.")
-
-    if due_date:
-        if not isinstance(due_date, str):
-            raise ValueError("Invalid due date.")
-
-        try:
-            date.fromisoformat(due_date)
-        except ValueError:
-            raise ValueError("Choose a valid due date.")
 
     if not isinstance(completed, bool):
         raise ValueError("Invalid completion status.")
@@ -344,7 +365,7 @@ def register():
     password_hash = generate_password_hash(password, method="scrypt")
 
     try:
-        with connect_db() as db:
+        with database_connection() as db:
             cursor = db.execute(
                 """
                 INSERT INTO users (email, password_hash)
@@ -385,7 +406,7 @@ def login():
     if len(email) > 254 or len(password) > 128:
         return error("Incorrect email or password.", 401)
 
-    with connect_db() as db:
+    with database_connection() as db:
         user = db.execute(
             """
             SELECT id, email, password_hash
@@ -430,7 +451,7 @@ def logout():
 @app.get("/api/tasks")
 @login_required
 def list_tasks():
-    with connect_db() as db:
+    with database_connection() as db:
         rows = db.execute(
             """
             SELECT id, title, description, category, priority,
@@ -462,7 +483,7 @@ def create_task():
     except ValueError as exc:
         return error(str(exc))
 
-    with connect_db() as db:
+    with database_connection() as db:
         cursor = db.execute(
             """
             INSERT INTO tasks
@@ -493,7 +514,7 @@ def update_task(task_id):
     except ValueError as exc:
         return error(str(exc))
 
-    with connect_db() as db:
+    with database_connection() as db:
         result = db.execute(
             """
             UPDATE tasks
@@ -527,7 +548,7 @@ def update_task(task_id):
 @app.delete("/api/tasks/<int:task_id>")
 @login_required
 def delete_task(task_id):
-    with connect_db() as db:
+    with database_connection() as db:
         result = db.execute(
             """
             DELETE FROM tasks
