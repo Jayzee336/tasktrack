@@ -878,6 +878,108 @@ const commandDefinitions = [
   { id: "calendar-week", label: "Open calendar week view", description: "Plan the current selected week", keywords: "calendar week planning" }
 ];
 
+
+// ========================================
+// PHASE 06 — PRODUCTIVITY INSIGHTS
+// ========================================
+
+function formatFocusMinutes(minutes) {
+  const value = Math.max(0, Number(minutes) || 0);
+  if (value < 60) return String(value);
+  const hours = Math.floor(value / 60);
+  const remainder = value % 60;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+
+function renderBarChart(selector, items, labelKey, valueKey, suffix = "tasks") {
+  const container = $(selector);
+  if (!container) return;
+  const values = items.map((item) => Math.max(0, Number(item[valueKey]) || 0));
+  const maxValue = Math.max(1, ...values);
+  container.innerHTML = items.map((item, index) => {
+    const value = values[index];
+    const height = value ? Math.max(6, Math.round(value / maxValue * 100)) : 0;
+    const label = String(item[labelKey] ?? "");
+    const accessible = `${label}: ${value} ${suffix}`;
+    return `<div class="insight-bar-item" title="${esc(accessible)}" aria-label="${esc(accessible)}">
+      <span class="insight-bar-value">${value || ""}</span>
+      <div class="insight-bar-track"><span class="insight-bar-fill" style="height:${height}%"></span></div>
+      <span class="insight-bar-label">${esc(label)}</span>
+    </div>`;
+  }).join("");
+}
+
+function renderBreakdown(selector, items, labelKey) {
+  const container = $(selector);
+  if (!container) return;
+  if (!items.length) {
+    container.innerHTML = '<p class="insight-empty">Add tasks to see your breakdown.</p>';
+    return;
+  }
+  const maximum = Math.max(1, ...items.map((item) => Number(item.total) || 0));
+  container.innerHTML = items.map((item) => {
+    const total = Number(item.total) || 0;
+    const completed = Number(item.completed) || 0;
+    const width = total ? Math.round(total / maximum * 100) : 0;
+    const label = String(item[labelKey] || "General");
+    return `<div class="insight-breakdown-row">
+      <div class="insight-breakdown-copy"><span>${esc(label)}</span><strong>${completed}/${total}</strong></div>
+      <div class="insight-breakdown-track" role="img" aria-label="${esc(label)}: ${completed} completed out of ${total}">
+        <span style="width:${width}%"></span>
+      </div>
+      <small>${total ? Math.round(completed / total * 100) : 0}% completed</small>
+    </div>`;
+  }).join("");
+}
+
+function renderInsights(data) {
+  const summary = data.summary || {};
+  $("#insight-current-streak").textContent = summary.current_streak || 0;
+  $("#insight-focus-week").textContent = formatFocusMinutes(summary.focus_minutes_week);
+  $("#insight-completed-total").textContent = summary.completed_tasks || 0;
+  $("#insight-active-caption").textContent =
+    `${summary.active_tasks || 0} active task${summary.active_tasks === 1 ? "" : "s"} remaining`;
+  $("#insight-completion-rate").textContent = summary.completion_rate || 0;
+  $("#insight-progress-bar").style.width = `${summary.completion_rate || 0}%`;
+  $("#insight-streak-caption").textContent = summary.current_streak
+    ? `Best streak: ${summary.longest_streak || summary.current_streak} day${(summary.longest_streak || summary.current_streak) === 1 ? "" : "s"}`
+    : "Complete a task today to start a streak.";
+  const weekTotal = (data.weekly_completions || []).reduce((sum, item) => sum + (Number(item.completed) || 0), 0);
+  const monthTotal = (data.monthly_completions || []).reduce((sum, item) => sum + (Number(item.completed) || 0), 0);
+  $("#insight-week-total").textContent = `${weekTotal} done`;
+  $("#insight-month-focus").textContent = `${formatFocusMinutes(summary.focus_minutes_month)} focused`;
+  renderBarChart("#insight-weekly-chart", data.weekly_completions || [], "label", "completed");
+  renderBarChart("#insight-monthly-chart", data.monthly_completions || [], "label", "completed");
+  renderBreakdown("#insight-categories", data.categories || [], "category");
+  renderBreakdown("#insight-priorities", data.priorities || [], "priority");
+  const note = $("#insight-tracking-note");
+  if (note) note.textContent = data.tracking_note || "";
+  const error = $("#insight-error");
+  if (error) error.hidden = true;
+}
+
+async function loadInsights() {
+  const error = $("#insight-error");
+  if (!error) return;
+  try {
+    const response = await fetch("/api/insights", {
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { Accept: "application/json" }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Could not load productivity insights.");
+    renderInsights(data);
+  } catch (exception) {
+    error.textContent = exception.message || "Could not load productivity insights.";
+    error.hidden = false;
+  }
+}
+
+document.addEventListener("tasktrack:tasks-updated", () => {
+  if (state.user) void loadInsights();
+});
+
 function clearAllFilters() {
   state.filter = "all";
   state.search = "";

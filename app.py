@@ -105,6 +105,7 @@ def init_db():
                 due_date TEXT,
                 completed INTEGER NOT NULL DEFAULT 0
                     CHECK(completed IN (0, 1)),
+                completed_at TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -138,6 +139,10 @@ ON focus_sessions(user_id, completed_at DESC);
             db.execute(
                 "ALTER TABLE tasks ADD COLUMN status TEXT NOT NULL DEFAULT 'todo'"
             )
+        if "completed_at" not in columns:
+            # Older databases have no reliable completion event history. Leave historical
+            # timestamps unknown rather than inventing dates from unrelated task edits.
+            db.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT")
         # One-time-safe synchronization: preserve completed tasks from older versions.
         db.execute(
             """
@@ -517,10 +522,11 @@ def create_task():
             """
             INSERT INTO tasks
                 (user_id, title, description, category,
-                 priority, due_date, status, completed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 priority, due_date, status, completed, completed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?,
+                    CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END)
             """,
-            (g.user["id"], *values),
+            (g.user["id"], *values, values[-1]),
         )
 
         row = db.execute(
@@ -554,10 +560,15 @@ def update_task(task_id):
                 due_date = ?,
                 status = ?,
                 completed = ?,
+                completed_at = CASE
+                    WHEN ? = 1 AND completed = 0 THEN CURRENT_TIMESTAMP
+                    WHEN ? = 0 THEN NULL
+                    ELSE completed_at
+                END,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?
             """,
-            (*values, task_id, g.user["id"]),
+            (*values, values[-1], values[-1], task_id, g.user["id"]),
         )
 
         if result.rowcount != 1:
@@ -592,6 +603,172 @@ def delete_task(task_id):
 
     return jsonify(ok=True)
 
+
+
+
+# --------------------------------------------------
+# Productivity Insights API
+# --------------------------------------------------
+
+@app.get("/api/insights")
+@login_required
+def productivity_insights():
+    """Return per-user productivity aggregates for the dashboard."""
+    today = date.today()
+    today_iso = today.isoformat()
+    week_start = today - __import__("datetime").timedelta(days=6)
+    week_start_iso = week_start.isoformat()
+    month_start_iso = today.replace(day=1).isoformat()
+
+    # Six calendar months, including this month.
+    month_starts = []
+    year, month = today.year, today.month
+    for _ in range(6):
+        month_starts.append(date(year, month, 1))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    month_starts.reverse()
+    first_month_iso = month_starts[0].isoformat()
+
+    with database_connection() as db:
+        task_rows = db.execute(
+            """
+            SELECT id, category, priority, completed, status, completed_at
+            FROM tasks
+            WHERE user_id = ?
+            """,
+            (g.user["id"],),
+        ).fetchall()
+
+        sessions = db.execute(
+            """
+            SELECT duration_minutes, session_type, completed_at
+            FROM focus_sessions
+            WHERE user_id = ?
+            """,
+            (g.user["id"],),
+        ).fetchall()
+
+    total_tasks = len(task_rows)
+    completed_tasks = sum(
+        1 for task in task_rows
+        if task["status"] == "done" or task["completed"]
+    )
+    active_tasks = total_tasks - completed_tasks
+    completion_rate = round(completed_tasks / total_tasks * 100) if total_tasks else 0
+
+    daily_counts = {}
+    completion_dates = set()
+    for task in task_rows:
+        completed_at = task["completed_at"]
+        if not completed_at:
+            continue
+        completed_day = completed_at[:10]
+        try:
+            date.fromisoformat(completed_day)
+        except ValueError:
+            continue
+        completion_dates.add(completed_day)
+        if week_start_iso <= completed_day <= today_iso:
+            daily_counts[completed_day] = daily_counts.get(completed_day, 0) + 1
+
+    weekly_completions = []
+    for offset in range(7):
+        day = week_start + __import__("datetime").timedelta(days=offset)
+        weekly_completions.append({
+            "date": day.isoformat(),
+            "label": day.strftime("%a"),
+            "completed": daily_counts.get(day.isoformat(), 0),
+        })
+
+    monthly_counts = {}
+    for task in task_rows:
+        completed_at = task["completed_at"]
+        if not completed_at:
+            continue
+        month_key = completed_at[:7]
+        if month_key >= first_month_iso[:7]:
+            monthly_counts[month_key] = monthly_counts.get(month_key, 0) + 1
+
+    monthly_completions = [{
+        "month": month_start.strftime("%Y-%m"),
+        "label": month_start.strftime("%b"),
+        "completed": monthly_counts.get(month_start.strftime("%Y-%m"), 0),
+    } for month_start in month_starts]
+
+    category_map = {}
+    priority_map = {}
+    for task in task_rows:
+        category = (task["category"] or "General").strip() or "General"
+        category_item = category_map.setdefault(category, {"category": category, "total": 0, "completed": 0})
+        category_item["total"] += 1
+        is_done = task["status"] == "done" or task["completed"]
+        if is_done:
+            category_item["completed"] += 1
+
+        priority = task["priority"] if task["priority"] in {"low", "medium", "high"} else "medium"
+        priority_item = priority_map.setdefault(priority, {"priority": priority, "total": 0, "completed": 0})
+        priority_item["total"] += 1
+        if is_done:
+            priority_item["completed"] += 1
+
+    categories = sorted(category_map.values(), key=lambda item: (-item["total"], item["category"].lower()))[:6]
+    priorities = [
+        priority_map.get(level, {"priority": level, "total": 0, "completed": 0})
+        for level in ("high", "medium", "low")
+    ]
+
+    # Current streak continues if the latest completion was today or yesterday.
+    streak_anchor = today_iso if today_iso in completion_dates else (today - __import__("datetime").timedelta(days=1)).isoformat()
+    current_streak = 0
+    cursor_day = date.fromisoformat(streak_anchor)
+    while cursor_day.isoformat() in completion_dates:
+        current_streak += 1
+        cursor_day -= __import__("datetime").timedelta(days=1)
+
+    longest_streak = 0
+    running_streak = 0
+    previous_day = None
+    for day_text in sorted(completion_dates):
+        this_day = date.fromisoformat(day_text)
+        if previous_day is not None and this_day == previous_day + __import__("datetime").timedelta(days=1):
+            running_streak += 1
+        else:
+            running_streak = 1
+        longest_streak = max(longest_streak, running_streak)
+        previous_day = this_day
+
+    focus_week_minutes = 0
+    focus_month_minutes = 0
+    for session in sessions:
+        if session["session_type"] != "focus" or not session["completed_at"]:
+            continue
+        session_day = session["completed_at"][:10]
+        if week_start_iso <= session_day <= today_iso:
+            focus_week_minutes += session["duration_minutes"]
+        if session_day >= month_start_iso and session_day <= today_iso:
+            focus_month_minutes += session["duration_minutes"]
+
+    return jsonify({
+        "summary": {
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks,
+            "active_tasks": active_tasks,
+            "completion_rate": completion_rate,
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "focus_minutes_week": focus_week_minutes,
+            "focus_minutes_month": focus_month_minutes,
+            "tracked_completion_days": len(completion_dates),
+        },
+        "weekly_completions": weekly_completions,
+        "monthly_completions": monthly_completions,
+        "categories": categories,
+        "priorities": priorities,
+        "tracking_note": "Completion history starts with this update. Older completed tasks remain included in totals, but their completion dates are unknown.",
+    })
 
 
 # --------------------------------------------------

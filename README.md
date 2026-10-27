@@ -53,6 +53,15 @@ tasktrack/
 - `tests/` contains the automated pytest suite. Local database inspection scripts are intentionally not tracked.
 - `deploy/` contains deployment examples that must be reviewed before use.
 
+## Phase 06 — Productivity Insights
+
+- Track newly completed tasks with a dedicated completion timestamp.
+- Review daily completions over the last 7 days and monthly totals over the last 6 months.
+- See task category and priority breakdowns, completion rate, and current/best completion streaks.
+- Review completed focus minutes for the current week and month.
+- Analytics are scoped to the signed-in user's own tasks and focus sessions.
+- Existing completed tasks remain part of totals, but their older completion dates cannot be reconstructed reliably.
+
 ## Phase 05 — Quick Actions and Smart Search
 
 - Search tasks by title, category, or notes.

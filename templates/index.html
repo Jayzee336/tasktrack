@@ -507,6 +507,71 @@
   </div>
 </section>
 
+      <!-- Productivity Insights -->
+      <section id="productivity-insights" class="insights-panel glass" aria-labelledby="insights-heading">
+        <div class="insights-heading">
+          <div>
+            <span class="eyebrow">YOUR MOMENTUM</span>
+            <h2 id="insights-heading">Productivity insights</h2>
+            <p class="insights-subtitle">Understand your habits and celebrate steady progress.</p>
+          </div>
+          <span class="insights-live"><span></span> Personal analytics</span>
+        </div>
+
+        <div class="insight-metrics" aria-label="Productivity summary">
+          <article class="insight-metric">
+            <span>Current streak</span>
+            <strong><span id="insight-current-streak">0</span><small>days</small></strong>
+            <p id="insight-streak-caption">Start with one completed task.</p>
+          </article>
+          <article class="insight-metric">
+            <span>Focus this week</span>
+            <strong><span id="insight-focus-week">0</span><small>min</small></strong>
+            <p>Completed focus sessions</p>
+          </article>
+          <article class="insight-metric">
+            <span>Completed tasks</span>
+            <strong><span id="insight-completed-total">0</span></strong>
+            <p id="insight-active-caption">0 active tasks remaining</p>
+          </article>
+          <article class="insight-metric">
+            <span>Completion rate</span>
+            <strong><span id="insight-completion-rate">0</span><small>%</small></strong>
+            <div class="insight-progress"><span id="insight-progress-bar"></span></div>
+          </article>
+        </div>
+
+        <div class="insight-chart-grid">
+          <article class="insight-chart-card">
+            <div class="insight-chart-heading">
+              <div><span class="eyebrow">LAST 7 DAYS</span><h3>Weekly completions</h3></div>
+              <span id="insight-week-total" class="insight-chart-total">0 done</span>
+            </div>
+            <div id="insight-weekly-chart" class="insight-bars weekly-bars" aria-label="Tasks completed per day this week"></div>
+          </article>
+          <article class="insight-chart-card">
+            <div class="insight-chart-heading">
+              <div><span class="eyebrow">LAST 6 MONTHS</span><h3>Monthly trend</h3></div>
+              <span id="insight-month-focus" class="insight-chart-total">0 min focused</span>
+            </div>
+            <div id="insight-monthly-chart" class="insight-bars monthly-bars" aria-label="Tasks completed per month"></div>
+          </article>
+        </div>
+
+        <div class="insight-breakdown-grid">
+          <article class="insight-breakdown-card">
+            <div class="insight-chart-heading"><div><span class="eyebrow">WHERE WORK HAPPENS</span><h3>By category</h3></div></div>
+            <div id="insight-categories" class="insight-breakdown-list"></div>
+          </article>
+          <article class="insight-breakdown-card">
+            <div class="insight-chart-heading"><div><span class="eyebrow">WORKLOAD MIX</span><h3>By priority</h3></div></div>
+            <div id="insight-priorities" class="insight-breakdown-list"></div>
+          </article>
+        </div>
+        <p id="insight-tracking-note" class="insight-tracking-note" role="note"></p>
+        <p id="insight-error" class="error insights-error" role="status" hidden></p>
+      </section>
+
       <!-- Task list -->
       <section class="task-panel glass">
 
